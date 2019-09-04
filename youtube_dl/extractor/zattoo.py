@@ -58,7 +58,8 @@ class ZattooPlatformBaseIE(InfoExtractor):
             r'appToken\s*=\s*(["\'])(?P<token>(?:(?!\1).)+?)\1',
             webpage, 'app token', group='token')
         app_version = self._html_search_regex(
-            r'<!--\w+-(.+?)-', webpage, 'app version', default='2.8.2')
+            r'<!--\w+-(.+?)-', webpage,
+            'app version', default='2.8.2').lstrip('v')
 
         # Will setup appropriate cookies
         self._request_webpage(
@@ -72,6 +73,20 @@ class ZattooPlatformBaseIE(InfoExtractor):
             }))
 
         self._login()
+
+    def _extract_video_id_from_recording(self, recid):
+        playlist = self._download_json(
+            '%s/zapi/v2/playlist' % self._host_url(),
+            recid, 'Downloading playlist')
+        try:
+            recordings = playlist['recordings']
+            return next(
+                compat_str(item['program_id']) for item in recordings
+                if item.get('program_id') and compat_str(
+                    item.get('id')) == recid
+            )
+        except (StopIteration, KeyError):
+            raise ExtractorError('Could not extract video id from recording')
 
     def _extract_cid(self, video_id, channel_name):
         channel_groups = self._download_json(
@@ -121,7 +136,22 @@ class ZattooPlatformBaseIE(InfoExtractor):
 
         return cid, info_dict
 
-    def _extract_formats(self, cid, video_id, record_id=None, is_live=False):
+    def _extract_ondemand_info(self, ondemand_id):
+        data = self._download_json(
+            '%s/zapi/avod/videos/%s' % (self._host_url(), ondemand_id),
+            ondemand_id, 'Downloading ondemand information'
+        )
+        info_dict = {
+            'id': ondemand_id,
+            'title': data['title'],
+            'description': data.get('description'),
+            'release_year': int_or_none(data.get('year')),
+            'episode_number': int_or_none(data.get('episode_number')),
+            'season_number': int_or_none(data.get('season_number')),
+        }
+        return info_dict
+
+    def _extract_formats(self, cid, video_id, record_id=None, ondemand_id=None, is_live=False):
         postdata_common = {
             'https_watch_urls': True,
         }
@@ -131,6 +161,8 @@ class ZattooPlatformBaseIE(InfoExtractor):
             url = '%s/zapi/watch/live/%s' % (self._host_url(), cid)
         elif record_id:
             url = '%s/zapi/watch/recording/%s' % (self._host_url(), record_id)
+        elif ondemand_id:
+            url = '%s/zapi/avod/videos/%s/watch' % (self._host_url(), ondemand_id)
         else:
             url = '%s/zapi/watch/recall/%s/%s' % (self._host_url(), cid, video_id)
 
@@ -202,6 +234,31 @@ class ZattooPlatformBaseIE(InfoExtractor):
         info_dict['formats'] = formats
         return info_dict
 
+    def _extract_live(self, channel_name):
+        cid = self._extract_cid(channel_name, channel_name)
+        info_dict = {
+            'id': channel_name,
+            'title': self._live_title(channel_name),
+            'is_live': True,
+        }
+        formats = self._extract_formats(cid, cid, is_live=True)
+        info_dict['formats'] = formats
+        return info_dict
+
+    def _extract_record(self, record_id):
+        video_id = self._extract_video_id_from_recording(record_id)
+        cid, info_dict = self._extract_cid_and_video_info(video_id)
+        formats = self._extract_formats(cid, video_id, record_id=record_id)
+        info_dict['formats'] = formats
+        return info_dict
+
+    def _extract_ondemand(self, ondemand_id):
+        info_dict = self._extract_ondemand_info(ondemand_id)
+        formats = self._extract_formats(
+            None, ondemand_id, ondemand_id=ondemand_id)
+        info_dict['formats'] = formats
+        return info_dict
+
 
 class QuicklineBaseIE(ZattooPlatformBaseIE):
     _NETRC_MACHINE = 'quickline'
@@ -248,6 +305,26 @@ def _make_valid_url(tmpl, host):
 
 
 class ZattooIE(ZattooBaseIE):
+    _VALID_URL_TEMPLATE = r'''(?x)
+                            https?://(?:www\.)?%s/
+                            (?:
+                                recordings\?recording=(?P<recid>[0-9]+)|
+                                ondemand\?video=(?P<ondemandid>[A-Za-z0-9]+)|
+                                channels\?channel=(?P<channelid>[^/]+)
+                            )'''
+    _VALID_URL = _make_valid_url(_VALID_URL_TEMPLATE, ZattooBaseIE._HOST)
+
+    def _real_extract(self, url):
+        record_id, ondemand_id, channel_id = re.match(self._VALID_URL, url).groups()
+        if record_id:
+            return self._extract_record(record_id)
+        elif ondemand_id:
+            return self._extract_ondemand(ondemand_id)
+        elif channel_id:
+            return self._extract_live(channel_id)
+
+
+class ZattooOldIE(ZattooBaseIE):
     _VALID_URL_TEMPLATE = r'https?://(?:www\.)?%s/watch/(?P<channel>[^/]+?)/(?P<id>[0-9]+)[^/]+(?:/(?P<recid>[0-9]+))?'
     _VALID_URL = _make_valid_url(_VALID_URL_TEMPLATE, ZattooBaseIE._HOST)
 
@@ -262,8 +339,10 @@ class ZattooIE(ZattooBaseIE):
     }]
 
     def _real_extract(self, url):
-        channel_name, video_id, record_id = re.match(self._VALID_URL, url).groups()
-        return self._extract_video(channel_name, video_id, record_id)
+        channel_name, video_id, record_id = re.match(
+            self._VALID_URL, url).groups()
+        return self._extract_video(
+            channel_name, video_id, record_id=record_id)
 
 
 class ZattooLiveIE(ZattooBaseIE):
