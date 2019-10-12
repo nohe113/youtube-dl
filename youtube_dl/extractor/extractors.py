@@ -1513,7 +1513,8 @@ from .zattoo import (
     VTXTVIE,
     WalyTVIE,
     ZattooIE,
-    ZattooLiveIE,
+    ZattooOldIE,
+    ZattooOldLiveIE,
 )
 from .zdf import ZDFIE, ZDFChannelIE
 from .zingmp3 import ZingMp3IE
