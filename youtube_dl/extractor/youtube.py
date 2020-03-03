@@ -69,7 +69,7 @@ class YoutubeBaseInfoExtractor(InfoExtractor):
     # If True it will raise an error if no login info is provided
     _LOGIN_REQUIRED = False
 
-    _PLAYLIST_ID_RE = r'(?:PL|LL|EC|UU|FL|RD|UL|TL|OLAK5uy_)[0-9A-Za-z-_]{10,}'
+    _PLAYLIST_ID_RE = r'(?:PL|LL|EC|UU|FL|RD|UL|TL|PU|OLAK5uy_)[0-9A-Za-z-_]{10,}'
 
     def _set_language(self):
         self._set_cookie(
@@ -372,7 +372,7 @@ class YoutubeIE(YoutubeBaseInfoExtractor):
     _VALID_URL = r"""(?x)^
                      (
                          (?:https?://|//)                                    # http(s):// or protocol-independent URL
-                         (?:(?:(?:(?:\w+\.)?[yY][oO][uU][tT][uU][bB][eE](?:-nocookie)?\.com/|
+                         (?:(?:(?:(?:\w+\.)?[yY][oO][uU][tT][uU][bB][eE](?:-nocookie|kids)?\.com/|
                             (?:www\.)?deturl\.com/www\.youtube\.com/|
                             (?:www\.)?pwnyoutube\.com/|
                             (?:www\.)?hooktube\.com/|
@@ -1224,6 +1224,10 @@ class YoutubeIE(YoutubeBaseInfoExtractor):
                 'skip_download': True,
             },
         },
+        {
+            'url': 'https://www.youtubekids.com/watch?v=3b8nCWDgZ6Q',
+            'only_matching': True,
+        },
     ]
 
     def __init__(self, *args, **kwargs):
@@ -1339,6 +1343,7 @@ class YoutubeIE(YoutubeBaseInfoExtractor):
         funcname = self._search_regex(
             (r'\b[cs]\s*&&\s*[adf]\.set\([^,]+\s*,\s*encodeURIComponent\s*\(\s*(?P<sig>[a-zA-Z0-9$]+)\(',
              r'\b[a-zA-Z0-9]+\s*&&\s*[a-zA-Z0-9]+\.set\([^,]+\s*,\s*encodeURIComponent\s*\(\s*(?P<sig>[a-zA-Z0-9$]+)\(',
+             r'\b(?P<sig>[a-zA-Z0-9$]{2})\s*=\s*function\(\s*a\s*\)\s*{\s*a\s*=\s*a\.split\(\s*""\s*\)',
              r'(?P<sig>[a-zA-Z0-9$]+)\s*=\s*function\(\s*a\s*\)\s*{\s*a\s*=\s*a\.split\(\s*""\s*\)',
              # Obsolete patterns
              r'(["\'])signature\1\s*,\s*(?P<sig>[a-zA-Z0-9$]+)\(',
@@ -2465,7 +2470,7 @@ class YoutubePlaylistIE(YoutubePlaylistBaseInfoExtractor):
                         (?:\w+\.)?
                         (?:
                             (?:
-                                youtube\.com|
+                                youtube(?:kids)?\.com|
                                 invidio\.us
                             )
                             /
@@ -2477,7 +2482,7 @@ class YoutubePlaylistIE(YoutubePlaylistBaseInfoExtractor):
                             youtu\.be/[0-9A-Za-z_-]{11}\?.*?\blist=
                         )
                         (
-                            (?:PL|LL|EC|UU|FL|RD|UL|TL|OLAK5uy_)?[0-9A-Za-z-_]{10,}
+                            (?:PL|LL|EC|UU|FL|RD|UL|TL|PU|OLAK5uy_)?[0-9A-Za-z-_]{10,}
                             # Top tracks, they can also include dots
                             |(?:MC)[\w\.]*
                         )
@@ -2490,20 +2495,23 @@ class YoutubePlaylistIE(YoutubePlaylistBaseInfoExtractor):
     _VIDEO_RE = _VIDEO_RE_TPL % r'(?P<id>[0-9A-Za-z_-]{11})'
     IE_NAME = 'youtube:playlist'
     _TESTS = [{
-        'url': 'https://www.youtube.com/playlist?list=PLwiyx1dc3P2JR9N8gQaQN_BCvlSlap7re',
+        'url': 'https://www.youtube.com/playlist?list=PL4lCao7KL_QFVb7Iudeipvc2BCavECqzc',
         'info_dict': {
-            'title': 'ytdl test PL',
-            'id': 'PLwiyx1dc3P2JR9N8gQaQN_BCvlSlap7re',
+            'uploader_id': 'UCmlqkdCBesrv2Lak1mF_MxA',
+            'uploader': 'Sergey M.',
+            'id': 'PL4lCao7KL_QFVb7Iudeipvc2BCavECqzc',
+            'title': 'youtube-dl public playlist',
         },
-        'playlist_count': 3,
+        'playlist_count': 1,
     }, {
-        'url': 'https://www.youtube.com/playlist?list=PLtPgu7CB4gbZDA7i_euNxn75ISqxwZPYx',
+        'url': 'https://www.youtube.com/playlist?list=PL4lCao7KL_QFodcLWhDpGCYnngnHtQ-Xf',
         'info_dict': {
-            'id': 'PLtPgu7CB4gbZDA7i_euNxn75ISqxwZPYx',
-            'title': 'YDL_Empty_List',
+            'uploader_id': 'UCmlqkdCBesrv2Lak1mF_MxA',
+            'uploader': 'Sergey M.',
+            'id': 'PL4lCao7KL_QFodcLWhDpGCYnngnHtQ-Xf',
+            'title': 'youtube-dl empty playlist',
         },
         'playlist_count': 0,
-        'skip': 'This playlist is private',
     }, {
         'note': 'Playlist with deleted videos (#651). As a bonus, the video #51 is also twice in this list.',
         'url': 'https://www.youtube.com/playlist?list=PLwP_SiAcdui0KVebT0mU9Apz359a4ubsC',
@@ -2513,7 +2521,7 @@ class YoutubePlaylistIE(YoutubePlaylistBaseInfoExtractor):
             'uploader': 'Christiaan008',
             'uploader_id': 'ChRiStIaAn008',
         },
-        'playlist_count': 95,
+        'playlist_count': 96,
     }, {
         'note': 'issue #673',
         'url': 'PLBB231211A4F62143',
@@ -2646,6 +2654,9 @@ class YoutubePlaylistIE(YoutubePlaylistBaseInfoExtractor):
         'only_matching': True,
     }, {
         'url': 'https://invidio.us/playlist?list=PLDIoUOhQQPlXr63I_vwF9GD8sAKh77dWU',
+        'only_matching': True,
+    }, {
+        'url': 'https://www.youtubekids.com/watch?v=Agk7R8I8o5U&list=PUZ6jURNr1WQZCNHF0ao-c0g',
         'only_matching': True,
     }]
 
@@ -2817,7 +2828,7 @@ class YoutubePlaylistIE(YoutubePlaylistBaseInfoExtractor):
 
 class YoutubeChannelIE(YoutubePlaylistBaseInfoExtractor):
     IE_DESC = 'YouTube.com channels'
-    _VALID_URL = r'https?://(?:youtu\.be|(?:\w+\.)?youtube(?:-nocookie)?\.com|(?:www\.)?invidio\.us)/channel/(?P<id>[0-9A-Za-z_-]+)'
+    _VALID_URL = r'https?://(?:youtu\.be|(?:\w+\.)?youtube(?:-nocookie|kids)?\.com|(?:www\.)?invidio\.us)/channel/(?P<id>[0-9A-Za-z_-]+)'
     _TEMPLATE_URL = 'https://www.youtube.com/channel/%s/videos'
     _VIDEO_RE = r'(?:title="(?P<title>[^"]+)"[^>]+)?href="/watch\?v=(?P<id>[0-9A-Za-z_-]+)&?'
     IE_NAME = 'youtube:channel'
@@ -2844,6 +2855,9 @@ class YoutubeChannelIE(YoutubePlaylistBaseInfoExtractor):
         },
     }, {
         'url': 'https://invidio.us/channel/UC23qupoDRn9YOAVzeoxjOQA',
+        'only_matching': True,
+    }, {
+        'url': 'https://www.youtubekids.com/channel/UCyu8StPfZWapR6rfW_JgqcA',
         'only_matching': True,
     }]
 
